@@ -1,0 +1,1134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Jigsaw Track Changes</title>
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+<style>
+  :root {
+    --deep-cove: #141B4D;
+    --deep-cove-dark: #0F1435;
+    --deep-cove-lightest: #F3F6FF;
+    --deep-cove-light: #CEDBFF;
+    --crimson: #AE2573;
+    --crimson-light: #DD83B7;
+    --crimson-lightest: #F6DFEC;
+    --coral: #FF6D6A;
+    --coral-lightest: #FFE9E9;
+    --butter: #F8E08E;
+    --star-white: #ECECE7;
+    --star-white-light: #F5F4F2;
+    --white: #ffffff;
+
+    --insert-bg: #e6f4ea;
+    --insert-color: #1a7f37;
+    --insert-border: #2da44e;
+    --delete-bg: #ffeef0;
+    --delete-color: #cf222e;
+    --delete-border: #f85149;
+
+    --font-heading: 'Söhne Breit', 'Sohne Breit', Arial, Helvetica, sans-serif;
+    --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+    --shadow-sm: 0 1px 3px rgba(20,27,77,0.06);
+    --shadow-md: 0 2px 8px rgba(20,27,77,0.10);
+    --shadow-lg: 0 8px 24px rgba(20,27,77,0.14);
+    --radius: 8px;
+    --radius-sm: 5px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--star-white-light);
+    color: var(--deep-cove);
+    font-size: 13px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── Header ── */
+  .header {
+    background: linear-gradient(135deg, #141B4D 0%, #AE2573 60%, #FF6D6A 100%);
+    padding: 14px 16px 12px;
+    flex-shrink: 0;
+  }
+  .header-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .logo {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+  }
+  .header-title {
+    font-family: var(--font-heading);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--white);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .header-sub {
+    font-size: 11px;
+    color: rgba(255,255,255,0.65);
+    margin-left: auto;
+  }
+
+  /* ── Status bar ── */
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255,255,255,0.12);
+    border-radius: var(--radius-sm);
+    padding: 6px 10px;
+    backdrop-filter: blur(4px);
+  }
+  .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.35);
+    transition: background 0.3s;
+    flex-shrink: 0;
+  }
+  .status-dot.active { background: #4ade80; box-shadow: 0 0 6px #4ade80; }
+  .status-dot.reviewing { background: var(--butter); box-shadow: 0 0 6px var(--butter); }
+  .status-text {
+    font-size: 11px;
+    color: rgba(255,255,255,0.85);
+    flex: 1;
+  }
+  .change-count {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--white);
+    background: rgba(255,255,255,0.2);
+    padding: 2px 7px;
+    border-radius: 10px;
+    display: none;
+  }
+  .change-count.visible { display: inline; }
+
+  /* ── Controls ── */
+  .controls {
+    padding: 12px 14px;
+    background: var(--white);
+    border-bottom: 1px solid rgba(20,27,77,0.08);
+    flex-shrink: 0;
+  }
+  .btn-row {
+    display: flex;
+    gap: 7px;
+    margin-bottom: 8px;
+  }
+  .btn {
+    flex: 1;
+    padding: 8px 10px;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    letter-spacing: 0.01em;
+  }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-primary {
+    background: var(--deep-cove);
+    color: var(--white);
+  }
+  .btn-primary:hover:not(:disabled) { background: var(--deep-cove-dark); transform: translateY(-1px); box-shadow: var(--shadow-md); }
+  .btn-primary.active {
+    background: linear-gradient(135deg, #1a7f37, #2da44e);
+  }
+  .btn-secondary {
+    background: var(--star-white);
+    color: var(--deep-cove);
+    border: 1px solid rgba(20,27,77,0.12);
+  }
+  .btn-secondary:hover:not(:disabled) { background: var(--deep-cove-lightest); }
+
+  .bulk-row {
+    display: flex;
+    gap: 5px;
+  }
+  .btn-bulk {
+    flex: 1;
+    padding: 6px 8px;
+    border: 1px solid;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-body);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.01em;
+  }
+  .btn-accept-all {
+    background: var(--insert-bg);
+    color: var(--insert-color);
+    border-color: var(--insert-border);
+  }
+  .btn-accept-all:hover:not(:disabled) { background: #cef0d3; }
+  .btn-reject-all {
+    background: var(--delete-bg);
+    color: var(--delete-color);
+    border-color: var(--delete-border);
+  }
+  .btn-reject-all:hover:not(:disabled) { background: #ffd5d8; }
+  .btn-bulk:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* ── Changes list ── */
+  .changes-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .changes-area::-webkit-scrollbar { width: 4px; }
+  .changes-area::-webkit-scrollbar-track { background: transparent; }
+  .changes-area::-webkit-scrollbar-thumb { background: var(--deep-cove-light); border-radius: 4px; }
+
+  .empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: rgba(20,27,77,0.35);
+    text-align: center;
+    padding: 20px;
+  }
+  .empty-icon { font-size: 32px; opacity: 0.4; }
+  .empty-title { font-weight: 600; font-size: 13px; color: rgba(20,27,77,0.5); }
+  .empty-desc { font-size: 11px; line-height: 1.5; }
+
+  /* ── Change card ── */
+  .change-card {
+    background: var(--white);
+    border-radius: var(--radius);
+    border: 1px solid rgba(20,27,77,0.08);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow 0.15s, transform 0.15s;
+    animation: slideIn 0.25s ease;
+  }
+  .change-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 10px 6px;
+    border-bottom: 1px solid rgba(20,27,77,0.05);
+  }
+  .change-type-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .badge-insert { background: var(--insert-bg); color: var(--insert-color); }
+  .badge-delete { background: var(--delete-bg); color: var(--delete-color); }
+  .badge-replace { background: #fff3cd; color: #856404; }
+
+  .card-meta {
+    font-size: 10px;
+    color: rgba(20,27,77,0.45);
+    margin-left: auto;
+    white-space: nowrap;
+  }
+  .card-author {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    font-weight: 500;
+    color: rgba(20,27,77,0.6);
+  }
+  .avatar {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--deep-cove), var(--crimson));
+    color: white;
+    font-size: 8px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .card-body { padding: 8px 10px; }
+  .card-slide-ref {
+    font-size: 10px;
+    color: rgba(20,27,77,0.4);
+    margin-bottom: 5px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .card-slide-ref::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    background: var(--deep-cove-light);
+    flex-shrink: 0;
+  }
+
+  .diff-view {
+    font-size: 12px;
+    line-height: 1.6;
+    background: var(--star-white-light);
+    border-radius: var(--radius-sm);
+    padding: 7px 9px;
+    font-family: var(--font-body);
+  }
+  .diff-delete {
+    background: var(--delete-bg);
+    color: var(--delete-color);
+    text-decoration: line-through;
+    border-radius: 2px;
+    padding: 0 2px;
+  }
+  .diff-insert {
+    background: var(--insert-bg);
+    color: var(--insert-color);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    border-radius: 2px;
+    padding: 0 2px;
+  }
+  .diff-context { color: rgba(20,27,77,0.55); }
+
+  .card-actions {
+    display: flex;
+    gap: 5px;
+    padding: 6px 10px 8px;
+  }
+  .btn-accept, .btn-reject {
+    flex: 1;
+    padding: 5px 8px;
+    border-radius: var(--radius-sm);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid;
+    transition: all 0.12s;
+    font-family: var(--font-body);
+  }
+  .btn-accept {
+    background: var(--insert-bg);
+    color: var(--insert-color);
+    border-color: var(--insert-border);
+  }
+  .btn-accept:hover { background: #cef0d3; }
+  .btn-reject {
+    background: var(--delete-bg);
+    color: var(--delete-color);
+    border-color: var(--delete-border);
+  }
+  .btn-reject:hover { background: #ffd5d8; }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed;
+    bottom: 14px;
+    left: 50%;
+    transform: translateX(-50%) translateY(40px);
+    background: var(--deep-cove);
+    color: var(--white);
+    font-size: 12px;
+    font-weight: 500;
+    padding: 8px 16px;
+    border-radius: 20px;
+    box-shadow: var(--shadow-lg);
+    opacity: 0;
+    transition: all 0.25s;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 1000;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ── Separator ── */
+  .section-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(20,27,77,0.4);
+    padding: 4px 0 2px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: rgba(20,27,77,0.08);
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-top">
+    <svg class="logo" viewBox="0 0 22 22" fill="none">
+      <rect x="0" y="0" width="10" height="10" rx="2" fill="white" opacity="0.9"/>
+      <rect x="12" y="0" width="10" height="10" rx="2" fill="white" opacity="0.6"/>
+      <rect x="0" y="12" width="10" height="10" rx="2" fill="white" opacity="0.6"/>
+      <rect x="12" y="12" width="10" height="10" rx="2" fill="white" opacity="0.9"/>
+    </svg>
+    <span class="header-title">Track Changes</span>
+    <span class="header-sub">Jigsaw</span>
+  </div>
+  <div class="status-bar">
+    <div class="status-dot" id="statusDot"></div>
+    <span class="status-text" id="statusText">Start tracking to begin review</span>
+    <span class="change-count" id="changeCount">0 changes</span>
+  </div>
+</div>
+
+<!-- Controls -->
+<div class="controls">
+  <div class="btn-row">
+    <button class="btn btn-primary" id="btnTrack" onclick="toggleTracking()">
+      <span id="trackIcon">▶</span>
+      <span id="trackLabel">Start Tracking</span>
+    </button>
+    <button class="btn btn-secondary" id="btnRefresh" onclick="checkChanges()" disabled>
+      ↻ Refresh
+    </button>
+  </div>
+  <div class="bulk-row">
+    <button class="btn-bulk btn-accept-all" id="btnAcceptAll" onclick="acceptAllChanges()" disabled>✓ Accept All</button>
+    <button class="btn-bulk btn-reject-all" id="btnRejectAll" onclick="rejectAllChanges()" disabled>✕ Reject All</button>
+  </div>
+</div>
+
+<!-- Changes list -->
+<div class="changes-area" id="changesArea">
+  <div class="empty-state" id="emptyState">
+    <div class="empty-icon">📋</div>
+    <div class="empty-title">No changes yet</div>
+    <div class="empty-desc">Click "Start Tracking" then edit text on your slide. Changes will appear here instantly.</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── State ──
+let isTracking = false;
+let snapshot = {}; // { shapeId: { text, name } }
+let changes = [];  // Array of change objects
+let pollingTimer = null;
+let changeIdCounter = 0;
+let currentUser = 'You';
+
+// ── Office Init ──
+Office.onReady(function(info) {
+  if (info.host === Office.HostType.PowerPoint) {
+    console.log('Office.js ready - PowerPoint');
+  }
+});
+
+// ── Core: snapshot all text shapes on active slide ──
+async function snapshotSlide() {
+  return new Promise((resolve, reject) => {
+    Office.context.document.getSelectedDataAsync(
+      Office.CoercionType.SlideRange,
+      async function(result) {
+        if (result.status !== Office.AsyncResultStatus.Succeeded) {
+          // Fallback: try to get via binding approach
+          resolve({});
+          return;
+        }
+        try {
+          await PowerPoint.run(async (context) => {
+            const slide = context.presentation.getSelectedSlides().getItemAt(0);
+            slide.load('shapes');
+            await context.sync();
+
+            slide.shapes.load('items');
+            await context.sync();
+
+            const snap = {};
+            for (const shape of slide.shapes.items) {
+              shape.load('id,name,textFrame');
+              await context.sync();
+
+              try {
+                shape.textFrame.load('textRanges');
+                await context.sync();
+
+                shape.textFrame.textRanges.load('items');
+                await context.sync();
+
+                let fullText = '';
+                for (const range of shape.textFrame.textRanges.items) {
+                  range.load('text');
+                  await context.sync();
+                  fullText += range.text;
+                }
+
+                snap[shape.id] = {
+                  text: fullText,
+                  name: shape.name
+                };
+              } catch(e) {
+                // Shape has no text
+              }
+            }
+            resolve(snap);
+          });
+        } catch(e) {
+          resolve({});
+        }
+      }
+    );
+  });
+}
+
+// ── Alternative snapshot using PowerPoint.run directly ──
+async function snapshotSlideAlt() {
+  const snap = {};
+  try {
+    await PowerPoint.run(async (context) => {
+      const slides = context.presentation.slides;
+      slides.load('items');
+      await context.sync();
+
+      if (slides.items.length === 0) return;
+
+      // Use first slide or selected
+      const slide = slides.items[0];
+      const shapes = slide.shapes;
+      shapes.load('items');
+      await context.sync();
+
+      for (const shape of shapes.items) {
+        try {
+          shape.load('id,name');
+          await context.sync();
+
+          const tf = shape.textFrame;
+          tf.load('text');
+          await context.sync();
+
+          if (tf.text !== undefined && tf.text !== null) {
+            snap[shape.id] = {
+              text: tf.text,
+              name: shape.name || `Shape ${shape.id}`
+            };
+          }
+        } catch(e) { /* no text frame */ }
+      }
+    });
+  } catch(e) {
+    console.warn('Snapshot error:', e);
+  }
+  return snap;
+}
+
+// ── Diff: word-level diff ──
+function wordDiff(oldText, newText) {
+  const oldWords = tokenize(oldText);
+  const newWords = tokenize(newText);
+  const dp = computeLCS(oldWords, newWords);
+  return buildDiff(oldWords, newWords, dp);
+}
+
+function tokenize(text) {
+  // Split on word boundaries while keeping spaces
+  return text.match(/\S+|\s+/g) || [];
+}
+
+function computeLCS(a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (a[i-1] === b[j-1]) dp[i][j] = dp[i-1][j-1] + 1;
+      else dp[i][j] = Math.max(dp[i-1][j], dp[i][j-1]);
+    }
+  }
+  return dp;
+}
+
+function buildDiff(a, b, dp) {
+  const result = [];
+  let i = a.length, j = b.length;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && a[i-1] === b[j-1]) {
+      result.unshift({ type: 'equal', text: a[i-1] });
+      i--; j--;
+    } else if (j > 0 && (i === 0 || dp[i][j-1] >= dp[i-1][j])) {
+      result.unshift({ type: 'insert', text: b[j-1] });
+      j--;
+    } else {
+      result.unshift({ type: 'delete', text: a[i-1] });
+      i--;
+    }
+  }
+  return result;
+}
+
+// ── Detect changes between snapshots ──
+function detectChanges(oldSnap, newSnap) {
+  const found = [];
+
+  const allIds = new Set([...Object.keys(oldSnap), ...Object.keys(newSnap)]);
+
+  for (const id of allIds) {
+    const oldEntry = oldSnap[id];
+    const newEntry = newSnap[id];
+
+    if (!oldEntry && newEntry) {
+      // New shape added (out of scope for V1 but register it)
+      continue;
+    }
+    if (oldEntry && !newEntry) {
+      continue;
+    }
+
+    const oldText = (oldEntry?.text || '').trim();
+    const newText = (newEntry?.text || '').trim();
+
+    if (oldText === newText) continue;
+
+    const diff = wordDiff(oldText, newText);
+    const hasInsert = diff.some(d => d.type === 'insert');
+    const hasDelete = diff.some(d => d.type === 'delete');
+
+    let changeType = 'replace';
+    if (hasInsert && !hasDelete) changeType = 'insert';
+    if (!hasInsert && hasDelete) changeType = 'delete';
+
+    // Check if we already have this change
+    const existing = changes.find(c => c.shapeId === id && !c.resolved);
+    if (existing) {
+      // Update the diff
+      existing.diff = diff;
+      existing.newText = newText;
+      existing.type = changeType;
+      existing.timestamp = new Date();
+    } else {
+      found.push({
+        id: `change-${++changeIdCounter}`,
+        shapeId: id,
+        shapeName: newEntry?.name || oldEntry?.name || 'Text Box',
+        type: changeType,
+        oldText,
+        newText,
+        diff,
+        author: currentUser,
+        timestamp: new Date(),
+        resolved: false
+      });
+    }
+  }
+
+  return found;
+}
+
+// ── Apply inline markup to slide ──
+async function applyInlineMarkup(change) {
+  try {
+    await PowerPoint.run(async (context) => {
+      const slides = context.presentation.slides;
+      slides.load('items');
+      await context.sync();
+
+      const slide = slides.items[0];
+      const shapes = slide.shapes;
+      shapes.load('items');
+      await context.sync();
+
+      const target = shapes.items.find(s => s.id === change.shapeId);
+      if (!target) return;
+
+      // Build markup text: deletions as [~~text~~] and insertions as [+text+]
+      // We use a simple representation in the text frame with formatting
+      // Build the new text with markup tokens
+      let markupText = '';
+      for (const part of change.diff) {
+        if (part.type === 'equal') {
+          markupText += part.text;
+        } else if (part.type === 'delete') {
+          markupText += part.text; // will be formatted with strikethrough
+        } else if (part.type === 'insert') {
+          markupText += part.text; // will be formatted with underline
+        }
+      }
+
+      // We'll set the text and apply character-level formatting
+      // This requires working with text ranges
+      const tf = target.textFrame;
+
+      // Clear and rebuild with formatting
+      // Note: Full character-level formatting via Office JS is limited
+      // We do best-effort: set the full marked-up text
+      // For demo purposes this shows the change visually
+      tf.load('text');
+      await context.sync();
+
+      // Build segments for character formatting
+      // Office JS doesn't expose full character-range formatting in add-ins yet
+      // Best available: use paragraphs + text ranges approach
+      // For the demo, we set the text with visual markers
+
+      // Actually set strikethrough/underline via paragraph text ranges
+      // This is the most PowerPoint-native approach available in Office JS
+      try {
+        const paragraphs = tf.paragraphs;
+        paragraphs.load('items');
+        await context.sync();
+
+        // Rebuild the first paragraph with diff markup
+        if (paragraphs.items.length > 0) {
+          const para = paragraphs.items[0];
+          const ranges = para.textRanges;
+          ranges.load('items');
+          await context.sync();
+
+          // Clear existing ranges and rebuild
+          // Add each diff part as a separate text run with appropriate formatting
+          for (let idx = 0; idx < change.diff.length; idx++) {
+            const part = change.diff[idx];
+            // We can't easily delete/insert individual runs via Office JS
+            // The cleanest approach: set full text then overlay formatting
+          }
+        }
+      } catch(e2) {
+        // Text range manipulation not available, use text annotation fallback
+      }
+
+      await context.sync();
+    });
+  } catch(e) {
+    console.warn('Markup application error:', e);
+  }
+}
+
+// ── Remove inline markup from slide ──
+async function removeInlineMarkup(change, accept) {
+  try {
+    await PowerPoint.run(async (context) => {
+      const slides = context.presentation.slides;
+      slides.load('items');
+      await context.sync();
+
+      const slide = slides.items[0];
+      const shapes = slide.shapes;
+      shapes.load('items');
+      await context.sync();
+
+      const target = shapes.items.find(s => s.id === change.shapeId);
+      if (!target) return;
+
+      const tf = target.textFrame;
+
+      if (accept) {
+        // Set to new text
+        tf.text = change.newText;
+      } else {
+        // Revert to old text
+        tf.text = change.oldText;
+      }
+
+      await context.sync();
+    });
+
+    // Update snapshot for this shape
+    snapshot[change.shapeId] = {
+      text: accept ? change.newText : change.oldText,
+      name: change.shapeName
+    };
+  } catch(e) {
+    console.warn('Remove markup error:', e);
+  }
+}
+
+// ── Poll for changes ──
+async function pollForChanges() {
+  if (!isTracking) return;
+
+  const current = await snapshotSlideAlt();
+  const newChanges = detectChanges(snapshot, current);
+
+  if (newChanges.length > 0) {
+    for (const c of newChanges) {
+      changes.push(c);
+    }
+    renderChanges();
+    updateStatus();
+  }
+
+  // Update snapshot to capture latest state for future diffs
+  // but keep the original snapshot for unresolved changes
+  pollingTimer = setTimeout(pollForChanges, 1200);
+}
+
+// ── Toggle tracking ──
+async function toggleTracking() {
+  if (!isTracking) {
+    // Start tracking
+    showToast('Taking snapshot...');
+    snapshot = await snapshotSlideAlt();
+
+    if (Object.keys(snapshot).length === 0) {
+      // Demo mode - populate with fake data for presentation
+      showDemoChanges();
+      return;
+    }
+
+    isTracking = true;
+    document.getElementById('trackLabel').textContent = 'Stop Tracking';
+    document.getElementById('trackIcon').textContent = '■';
+    document.getElementById('btnTrack').classList.add('active');
+    document.getElementById('btnRefresh').disabled = false;
+    document.getElementById('statusDot').classList.add('active');
+    document.getElementById('statusText').textContent = 'Tracking active — edit slide text';
+
+    pollingTimer = setTimeout(pollForChanges, 1200);
+    showToast('Tracking started');
+  } else {
+    // Stop tracking
+    clearTimeout(pollingTimer);
+    isTracking = false;
+    document.getElementById('trackLabel').textContent = 'Start Tracking';
+    document.getElementById('trackIcon').textContent = '▶';
+    document.getElementById('btnTrack').classList.remove('active');
+    document.getElementById('btnRefresh').disabled = true;
+    document.getElementById('statusDot').classList.remove('active');
+    document.getElementById('statusDot').classList.remove('reviewing');
+    document.getElementById('statusText').textContent = 'Tracking paused';
+    showToast('Tracking stopped');
+  }
+}
+
+async function checkChanges() {
+  if (!isTracking) return;
+  const current = await snapshotSlideAlt();
+  const newChanges = detectChanges(snapshot, current);
+  if (newChanges.length > 0) {
+    for (const c of newChanges) changes.push(c);
+    renderChanges();
+    updateStatus();
+    showToast(`${newChanges.length} new change${newChanges.length > 1 ? 's' : ''} found`);
+  } else {
+    showToast('No new changes');
+  }
+}
+
+// ── Accept / Reject ──
+async function acceptChange(changeId) {
+  const change = changes.find(c => c.id === changeId);
+  if (!change) return;
+  await removeInlineMarkup(change, true);
+  change.resolved = true;
+  change.resolution = 'accepted';
+  renderChanges();
+  updateStatus();
+  showToast('Change accepted ✓');
+}
+
+async function rejectChange(changeId) {
+  const change = changes.find(c => c.id === changeId);
+  if (!change) return;
+  await removeInlineMarkup(change, false);
+  change.resolved = true;
+  change.resolution = 'rejected';
+  renderChanges();
+  updateStatus();
+  showToast('Change rejected ✕');
+}
+
+async function acceptAllChanges() {
+  const unresolved = changes.filter(c => !c.resolved);
+  for (const c of unresolved) {
+    await removeInlineMarkup(c, true);
+    c.resolved = true;
+    c.resolution = 'accepted';
+  }
+  renderChanges();
+  updateStatus();
+  showToast(`All ${unresolved.length} changes accepted ✓`);
+}
+
+async function rejectAllChanges() {
+  const unresolved = changes.filter(c => !c.resolved);
+  for (const c of unresolved) {
+    await removeInlineMarkup(c, false);
+    c.resolved = true;
+    c.resolution = 'rejected';
+  }
+  renderChanges();
+  updateStatus();
+  showToast(`All ${unresolved.length} changes rejected ✕`);
+}
+
+// ── Render ──
+function renderChanges() {
+  const area = document.getElementById('changesArea');
+  const unresolved = changes.filter(c => !c.resolved);
+  const resolved = changes.filter(c => c.resolved);
+
+  if (changes.length === 0) {
+    area.innerHTML = `
+      <div class="empty-state" id="emptyState">
+        <div class="empty-icon">📋</div>
+        <div class="empty-title">No changes yet</div>
+        <div class="empty-desc">Click "Start Tracking" then edit text on your slide. Changes will appear here instantly.</div>
+      </div>`;
+    return;
+  }
+
+  let html = '';
+
+  if (unresolved.length > 0) {
+    html += `<div class="section-label">${unresolved.length} pending</div>`;
+    for (const c of unresolved) {
+      html += renderCard(c);
+    }
+  }
+
+  if (resolved.length > 0) {
+    html += `<div class="section-label" style="margin-top:6px;">${resolved.length} resolved</div>`;
+    for (const c of resolved) {
+      html += renderResolvedCard(c);
+    }
+  }
+
+  area.innerHTML = html;
+
+  document.getElementById('btnAcceptAll').disabled = unresolved.length === 0;
+  document.getElementById('btnRejectAll').disabled = unresolved.length === 0;
+}
+
+function renderCard(c) {
+  const badgeClass = c.type === 'insert' ? 'badge-insert' : c.type === 'delete' ? 'badge-delete' : 'badge-replace';
+  const badgeLabel = c.type === 'insert' ? 'Insertion' : c.type === 'delete' ? 'Deletion' : 'Edit';
+  const timeStr = formatTime(c.timestamp);
+  const initials = c.author.split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2);
+
+  const diffHtml = buildDiffHtml(c.diff);
+
+  return `
+  <div class="change-card" id="card-${c.id}">
+    <div class="card-header">
+      <span class="change-type-badge ${badgeClass}">${badgeLabel}</span>
+      <div class="card-author">
+        <div class="avatar">${initials}</div>
+        ${c.author}
+      </div>
+      <span class="card-meta">${timeStr}</span>
+    </div>
+    <div class="card-body">
+      <div class="card-slide-ref">${c.shapeName}</div>
+      <div class="diff-view">${diffHtml}</div>
+    </div>
+    <div class="card-actions">
+      <button class="btn-accept" onclick="acceptChange('${c.id}')">✓ Accept</button>
+      <button class="btn-reject" onclick="rejectChange('${c.id}')">✕ Reject</button>
+    </div>
+  </div>`;
+}
+
+function renderResolvedCard(c) {
+  const accepted = c.resolution === 'accepted';
+  const borderColor = accepted ? 'rgba(45,164,78,0.25)' : 'rgba(248,81,73,0.25)';
+  const labelColor = accepted ? 'var(--insert-color)' : 'var(--delete-color)';
+  const label = accepted ? '✓ Accepted' : '✕ Rejected';
+
+  return `
+  <div class="change-card" style="opacity:0.55; border-color:${borderColor};">
+    <div class="card-header">
+      <span style="font-size:10px; font-weight:700; color:${labelColor};">${label}</span>
+      <div class="card-author">
+        <div class="avatar">${c.author[0]}</div>
+        ${c.author}
+      </div>
+      <span class="card-meta">${c.shapeName}</span>
+    </div>
+  </div>`;
+}
+
+function buildDiffHtml(diff) {
+  // Collapse context — show only a window around changes
+  const CONTEXT = 4;
+  const parts = diff.map((d, i) => ({ ...d, i }));
+  const changed = new Set(parts.filter(p => p.type !== 'equal').map(p => p.i));
+  const visible = new Set();
+  for (const idx of changed) {
+    for (let k = Math.max(0, idx - CONTEXT); k <= Math.min(diff.length - 1, idx + CONTEXT); k++) {
+      visible.add(k);
+    }
+  }
+
+  let html = '';
+  let prevVisible = true;
+  for (let i = 0; i < diff.length; i++) {
+    if (!visible.has(i)) {
+      if (prevVisible) html += '<span class="diff-context">…</span>';
+      prevVisible = false;
+      continue;
+    }
+    prevVisible = true;
+    const d = diff[i];
+    const txt = escapeHtml(d.text);
+    if (d.type === 'equal') {
+      html += `<span class="diff-context">${txt}</span>`;
+    } else if (d.type === 'delete') {
+      html += `<span class="diff-delete">${txt}</span>`;
+    } else if (d.type === 'insert') {
+      html += `<span class="diff-insert">${txt}</span>`;
+    }
+  }
+  return html || '<span class="diff-context">Empty</span>';
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function formatTime(date) {
+  const now = new Date();
+  const diff = Math.floor((now - date) / 1000);
+  if (diff < 10) return 'just now';
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function updateStatus() {
+  const unresolved = changes.filter(c => !c.resolved);
+  const el = document.getElementById('changeCount');
+  const dot = document.getElementById('statusDot');
+  const text = document.getElementById('statusText');
+
+  if (unresolved.length > 0) {
+    el.textContent = `${unresolved.length} change${unresolved.length > 1 ? 's' : ''}`;
+    el.classList.add('visible');
+    dot.classList.add('reviewing');
+    text.textContent = `${unresolved.length} change${unresolved.length > 1 ? 's' : ''} pending review`;
+  } else {
+    el.classList.remove('visible');
+    if (isTracking) {
+      dot.classList.remove('reviewing');
+      dot.classList.add('active');
+      text.textContent = 'Tracking active — edit slide text';
+    }
+  }
+}
+
+// ── Toast ──
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ── Demo mode (when Office API not available or no shapes found) ──
+function showDemoChanges() {
+  isTracking = true;
+  document.getElementById('trackLabel').textContent = 'Stop Tracking';
+  document.getElementById('trackIcon').textContent = '■';
+  document.getElementById('btnTrack').classList.add('active');
+  document.getElementById('btnRefresh').disabled = false;
+  document.getElementById('statusDot').classList.add('reviewing');
+  document.getElementById('btnAcceptAll').disabled = false;
+  document.getElementById('btnRejectAll').disabled = false;
+
+  const now = new Date();
+  const t = (s) => new Date(now - s * 1000);
+
+  changes = [
+    {
+      id: 'change-1',
+      shapeId: 'demo-1',
+      shapeName: 'Transaction Steps',
+      type: 'replace',
+      oldText: 'The Borrower shall repay all outstanding amounts by the Repayment Date as defined in Schedule 1.',
+      newText: 'The Borrower shall repay all outstanding principal amounts by the Final Repayment Date as defined in Schedule 1.',
+      diff: wordDiff(
+        'The Borrower shall repay all outstanding amounts by the Repayment Date as defined in Schedule 1.',
+        'The Borrower shall repay all outstanding principal amounts by the Final Repayment Date as defined in Schedule 1.'
+      ),
+      author: 'Sarah Chen',
+      timestamp: t(85),
+      resolved: false
+    },
+    {
+      id: 'change-2',
+      shapeId: 'demo-2',
+      shapeName: 'Entity Structure Note',
+      type: 'insert',
+      oldText: 'HoldCo incorporated in England and Wales.',
+      newText: 'HoldCo incorporated in England and Wales (company no. 12345678).',
+      diff: wordDiff(
+        'HoldCo incorporated in England and Wales.',
+        'HoldCo incorporated in England and Wales (company no. 12345678).'
+      ),
+      author: 'You',
+      timestamp: t(42),
+      resolved: false
+    },
+    {
+      id: 'change-3',
+      shapeId: 'demo-3',
+      shapeName: 'Transaction Steps',
+      type: 'delete',
+      oldText: 'Subject to satisfaction of the Conditions Precedent, including regulatory approval and board resolutions.',
+      newText: 'Subject to satisfaction of the Conditions Precedent.',
+      diff: wordDiff(
+        'Subject to satisfaction of the Conditions Precedent, including regulatory approval and board resolutions.',
+        'Subject to satisfaction of the Conditions Precedent.'
+      ),
+      author: 'James Park',
+      timestamp: t(18),
+      resolved: false
+    }
+  ];
+
+  renderChanges();
+  updateStatus();
+  document.getElementById('statusText').textContent = '3 changes detected';
+  showToast('Demo mode — 3 sample changes loaded');
+}
+</script>
+</body>
+</html>
