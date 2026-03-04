@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Jigsaw Track Changes</title>
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+<style>
+  :root {
+    --deep-cove: #141B4D;
+    --deep-cove-dark: #0F1435;
+    --deep-cove-lightest: #F3F6FF;
+    --deep-cove-light: #CEDBFF;
+    --crimson: #AE2573;
+    --coral: #FF6D6A;
+    --star-white: #ECECE7;
+    --star-white-light: #F5F4F2;
+    --white: #ffffff;
+    --insert-bg: #e6f4ea;
+    --insert-color: #1a7f37;
+    --insert-border: #2da44e;
+    --delete-bg: #ffeef0;
+    --delete-color: #cf222e;
+    --delete-border: #f85149;
+    --font-heading: 'Söhne Breit', 'Sohne Breit', Arial, Helvetica, sans-serif;
+    --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --shadow-sm: 0 1px 3px rgba(20,27,77,0.06);
+    --shadow-md: 0 2px 8px rgba(20,27,77,0.10);
+    --shadow-lg: 0 8px 24px rgba(20,27,77,0.14);
+    --radius: 8px;
+    --radius-sm: 5px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--font-body);
+    background: var(--star-white-light);
+    color: var(--deep-cove);
+    font-size: 13px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .header {
+    background: linear-gradient(135deg, #141B4D 0%, #AE2573 60%, #FF6D6A 100%);
+    padding: 14px 16px 12px;
+    flex-shrink: 0;
+  }
+  .header-top { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .logo { width: 22px; height: 22px; flex-shrink: 0; }
+  .header-title { font-family: var(--font-heading); font-size: 13px; font-weight: 600; color: var(--white); letter-spacing: 0.04em; text-transform: uppercase; }
+  .header-sub { font-size: 11px; color: rgba(255,255,255,0.65); margin-left: auto; }
+  .status-bar { display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.12); border-radius: var(--radius-sm); padding: 6px 10px; }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,0.35); transition: background 0.3s; flex-shrink: 0; }
+  .status-dot.active { background: #4ade80; box-shadow: 0 0 6px #4ade80; }
+  .status-dot.reviewing { background: #F8E08E; box-shadow: 0 0 6px #F8E08E; }
+  .status-text { font-size: 11px; color: rgba(255,255,255,0.85); flex: 1; }
+  .change-count { font-size: 11px; font-weight: 600; color: var(--white); background: rgba(255,255,255,0.2); padding: 2px 7px; border-radius: 10px; display: none; }
+  .change-count.visible { display: inline; }
+  .controls { padding: 12px 14px; background: var(--white); border-bottom: 1px solid rgba(20,27,77,0.08); flex-shrink: 0; }
+  .btn-row { display: flex; gap: 7px; margin-bottom: 8px; }
+  .btn { flex: 1; padding: 8px 10px; border: none; border-radius: var(--radius-sm); font-family: var(--font-body); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: center; gap: 5px; letter-spacing: 0.01em; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-primary { background: var(--deep-cove); color: var(--white); }
+  .btn-primary:hover:not(:disabled) { background: var(--deep-cove-dark); transform: translateY(-1px); box-shadow: var(--shadow-md); }
+  .btn-primary.tracking { background: #1a7f37; }
+  .btn-secondary { background: var(--star-white); color: var(--deep-cove); border: 1px solid rgba(20,27,77,0.12); }
+  .btn-secondary:hover:not(:disabled) { background: var(--deep-cove-lightest); }
+  .bulk-row { display: flex; gap: 5px; }
+  .btn-bulk { flex: 1; padding: 6px 8px; border: 1px solid; border-radius: var(--radius-sm); font-family: var(--font-body); font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.15s; letter-spacing: 0.01em; }
+  .btn-accept-all { background: var(--insert-bg); color: var(--insert-color); border-color: var(--insert-border); }
+  .btn-accept-all:hover:not(:disabled) { background: #cef0d3; }
+  .btn-reject-all { background: var(--delete-bg); color: var(--delete-color); border-color: var(--delete-border); }
+  .btn-reject-all:hover:not(:disabled) { background: #ffd5d8; }
+  .btn-bulk:disabled { opacity: 0.35; cursor: not-allowed; }
+  .changes-area { flex: 1; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 7px; }
+  .changes-area::-webkit-scrollbar { width: 4px; }
+  .changes-area::-webkit-scrollbar-thumb { background: var(--deep-cove-light); border-radius: 4px; }
+  .empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: rgba(20,27,77,0.35); text-align: center; padding: 20px; }
+  .empty-icon { font-size: 32px; opacity: 0.4; }
+  .empty-title { font-weight: 600; font-size: 13px; color: rgba(20,27,77,0.5); }
+  .empty-desc { font-size: 11px; line-height: 1.5; }
+  .change-card { background: var(--white); border-radius: var(--radius); border: 1px solid rgba(20,27,77,0.08); overflow: hidden; box-shadow: var(--shadow-sm); transition: box-shadow 0.15s, transform 0.15s; animation: slideIn 0.25s ease; }
+  .change-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+  @keyframes slideIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+  .card-header { display: flex; align-items: center; gap: 7px; padding: 8px 10px 6px; border-bottom: 1px solid rgba(20,27,77,0.05); }
+  .change-type-badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px; letter-spacing: 0.06em; text-transform: uppercase; }
+  .badge-insert { background: var(--insert-bg); color: var(--insert-color); }
+  .badge-delete { background: var(--delete-bg); color: var(--delete-color); }
+  .badge-replace { background: #fff3cd; color: #856404; }
+  .card-meta { font-size: 10px; color: rgba(20,27,77,0.45); margin-left: auto; white-space: nowrap; }
+  .card-author { display: flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 500; color: rgba(20,27,77,0.6); }
+  .avatar { width: 16px; height: 16px; border-radius: 50%; background: linear-gradient(135deg, var(--deep-cove), var(--crimson)); color: white; font-size: 8px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .card-body { padding: 8px 10px; }
+  .card-slide-ref { font-size: 10px; color: rgba(20,27,77,0.4); margin-bottom: 5px; display: flex; align-items: center; gap: 4px; }
+  .card-slide-ref::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: var(--deep-cove-light); flex-shrink: 0; }
+  .diff-view { font-size: 12px; line-height: 1.6; background: var(--star-white-light); border-radius: var(--radius-sm); padding: 7px 9px; font-family: var(--font-body); }
+  .diff-delete { background: var(--delete-bg); color: var(--delete-color); text-decoration: line-through; border-radius: 2px; padding: 0 2px; }
+  .diff-insert { background: var(--insert-bg); color: var(--insert-color); text-decoration: underline; text-underline-offset: 2px; border-radius: 2px; padding: 0 2px; }
+  .diff-context { color: rgba(20,27,77,0.55); }
+  .card-actions { display: flex; gap: 5px; padding: 6px 10px 8px; }
+  .btn-accept, .btn-reject { flex: 1; padding: 5px 8px; border-radius: var(--radius-sm); font-size: 11px; font-weight: 600; cursor: pointer; border: 1px solid; transition: all 0.12s; font-family: var(--font-body); }
+  .btn-accept { background: var(--insert-bg); color: var(--insert-color); border-color: var(--insert-border); }
+  .btn-accept:hover { background: #cef0d3; }
+  .btn-reject { background: var(--delete-bg); color: var(--delete-color); border-color: var(--delete-border); }
+  .btn-reject:hover { background: #ffd5d8; }
+  .section-label { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(20,27,77,0.4); padding: 4px 0 2px; display: flex; align-items: center; gap: 6px; }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: rgba(20,27,77,0.08); }
+  .toast { position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%) translateY(40px); background: var(--deep-cove); color: var(--white); font-size: 12px; font-weight: 500; padding: 8px 16px; border-radius: 20px; box-shadow: var(--shadow-lg); opacity: 0; transition: all 0.25s; pointer-events: none; white-space: nowrap; z-index: 1000; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <svg class="logo" viewBox="0 0 22 22" fill="none">
+      <rect x="0" y="0" width="10" height="10" rx="2" fill="white" opacity="0.9"/>
+      <rect x="12" y="0" width="10" height="10" rx="2" fill="white" opacity="0.6"/>
+      <rect x="0" y="12" width="10" height="10" rx="2" fill="white" opacity="0.6"/>
+      <rect x="12" y="12" width="10" height="10" rx="2" fill="white" opacity="0.9"/>
+    </svg>
+    <span class="header-title">Track Changes</span>
+    <span class="header-sub">Jigsaw</span>
+  </div>
+  <div class="status-bar">
+    <div class="status-dot" id="statusDot"></div>
+    <span class="status-text" id="statusText">Start tracking to begin review</span>
+    <span class="change-count" id="changeCount"></span>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="btn-row">
+    <button class="btn btn-primary" id="btnTrack" onclick="toggleTracking()">
+      <span id="trackIcon">▶</span>
+      <span id="trackLabel">Start Tracking</span>
+    </button>
+    <button class="btn btn-secondary" id="btnRefresh" onclick="manualCheck()" disabled>↻ Check</button>
+  </div>
+  <div class="bulk-row">
+    <button class="btn-bulk btn-accept-all" id="btnAcceptAll" onclick="acceptAll()" disabled>✓ Accept All</button>
+    <button class="btn-bulk btn-reject-all" id="btnRejectAll" onclick="rejectAll()" disabled>✕ Reject All</button>
+  </div>
+</div>
+
+<div class="changes-area" id="changesArea">
+  <div class="empty-state">
+    <div class="empty-icon">📋</div>
+    <div class="empty-title">No changes yet</div>
+    <div class="empty-desc">Click "Start Tracking", then edit any text box on your slide. Click outside the text box and changes will appear here.</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── State ───────────────────────────────────────────────────────────────────
+let isTracking = false;
+let snapshot = {};   // shapeId → { name, paragraphs: [{runs:[{text,bold,italic,size,color,underline,fontName}]}] }
+let changes  = [];
+let pollingTimer = null;
+let idCounter = 0;
+const POLL_MS = 900;
+
+// ─── Office init ─────────────────────────────────────────────────────────────
+Office.onReady(info => { console.log('Office ready', info.host); });
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function flatText(shapeSnap) {
+  return shapeSnap.paragraphs.map(p => p.runs.map(r => r.text).join('')).join('\n');
+}
+
+// ─── Snapshot ────────────────────────────────────────────────────────────────
+async function takeSnapshot() {
+  const snap = {};
+  try {
+    await PowerPoint.run(async ctx => {
+      const slides = ctx.presentation.slides;
+      slides.load('items');
+      await ctx.sync();
+      if (!slides.items.length) return;
+
+      const slide = slides.items[0];
+      slide.load('shapes');
+      await ctx.sync();
+      slide.shapes.load('items');
+      await ctx.sync();
+
+      for (const shape of slide.shapes.items) {
+        try {
+          shape.load('id,name');
+          await ctx.sync();
+
+          const tf = shape.textFrame;
+          tf.load('paragraphs');
+          await ctx.sync();
+          tf.paragraphs.load('items');
+          await ctx.sync();
+
+          const paras = [];
+          for (const para of tf.paragraphs.items) {
+            para.load('textRanges');
+            await ctx.sync();
+            para.textRanges.load('items');
+            await ctx.sync();
+
+            const runs = [];
+            for (const run of para.textRanges.items) {
+              run.load('text');
+              await ctx.sync();
+              try {
+                run.font.load('bold,italic,size,color,underline,name');
+                await ctx.sync();
+                runs.push({
+                  text:      run.text,
+                  bold:      run.font.bold,
+                  italic:    run.font.italic,
+                  size:      run.font.size,
+                  color:     run.font.color,
+                  underline: run.font.underline,
+                  fontName:  run.font.name
+                });
+              } catch(fe) {
+                runs.push({ text: run.text });
+              }
+            }
+            paras.push({ runs });
+          }
+
+          snap[shape.id] = { name: shape.name, paragraphs: paras };
+        } catch(e) { /* shape has no text frame */ }
+      }
+    });
+  } catch(e) { console.warn('takeSnapshot error:', e); }
+  return snap;
+}
+
+// ─── Diff ────────────────────────────────────────────────────────────────────
+function tokenize(text) { return text.match(/\S+|\s+/g) || []; }
+
+function wordDiff(oldText, newText) {
+  const a = tokenize(oldText), b = tokenize(newText);
+  const m = a.length, n = b.length;
+  const dp = Array.from({length: m+1}, () => new Int32Array(n+1));
+  for (let i = 1; i <= m; i++)
+    for (let j = 1; j <= n; j++)
+      dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1]+1 : Math.max(dp[i-1][j], dp[i][j-1]);
+
+  const res = [];
+  let i = m, j = n;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && a[i-1] === b[j-1]) { res.unshift({type:'equal',  text:a[i-1]}); i--; j--; }
+    else if (j > 0 && (i===0 || dp[i][j-1] >= dp[i-1][j])) { res.unshift({type:'insert', text:b[j-1]}); j--; }
+    else { res.unshift({type:'delete', text:a[i-1]}); i--; }
+  }
+  return res;
+}
+
+// ─── Detect changes ──────────────────────────────────────────────────────────
+function detectChanges(oldSnap, newSnap) {
+  const found = [];
+  for (const id of Object.keys(newSnap)) {
+    if (!oldSnap[id]) continue;
+    const oldText = flatText(oldSnap[id]);
+    const newText = flatText(newSnap[id]);
+    if (oldText === newText) continue;
+
+    const existing = changes.find(c => c.shapeId === id && !c.resolved);
+    const diff = wordDiff(oldText, newText);
+    const hasIns = diff.some(d => d.type==='insert');
+    const hasDel = diff.some(d => d.type==='delete');
+    const type = hasIns && hasDel ? 'replace' : hasIns ? 'insert' : 'delete';
+
+    if (existing) {
+      existing.newText = newText;
+      existing.diff    = diff;
+      existing.type    = type;
+      existing._dirty  = true;
+    } else {
+      found.push({
+        id:           `c${++idCounter}`,
+        shapeId:      id,
+        shapeName:    newSnap[id].name || 'Text Box',
+        type,
+        oldText,
+        newText,
+        diff,
+        origParas:    JSON.parse(JSON.stringify(oldSnap[id].paragraphs)),
+        author:       'You',
+        timestamp:    new Date(),
+        resolved:     false,
+        _dirty:       false
+      });
+    }
+  }
+  return found;
+}
+
+// ─── Apply inline markup to the slide ────────────────────────────────────────
+// Strategy: rebuild the first paragraph as a sequence of text ranges,
+// each formatted according to its diff type.
+async function applyMarkup(change) {
+  try {
+    await PowerPoint.run(async ctx => {
+      const shape = await getShape(ctx, change.shapeId);
+      if (!shape) return;
+
+      const tf = shape.textFrame;
+
+      // Build segments: {text, type}
+      // For 'delete' segments we keep them visible (red strikethrough)
+      // For 'insert' segments: blue underline
+      // We'll set one flat text string, then apply formatting by rebuilding runs
+
+      // Flatten diff into plain segments
+      const segs = change.diff.map(d => ({text: d.text, type: d.type}));
+
+      // Set full text (delete + equal + insert all present)
+      let fullText = segs.map(s => s.text).join('');
+
+      // We write paragraph by paragraph — for simplicity we flatten to one paragraph
+      // (multiline support can come later; handles the primary demo case)
+      tf.text = fullText;
+      await ctx.sync();
+
+      // Re-load to get fresh paragraph/run refs
+      tf.load('paragraphs');
+      await ctx.sync();
+      tf.paragraphs.load('items');
+      await ctx.sync();
+
+      if (!tf.paragraphs.items.length) return;
+      const para = tf.paragraphs.items[0];
+
+      // Apply per-character formatting via getSubstring (character ranges)
+      let pos = 0;
+      for (const seg of segs) {
+        const len = seg.text.length;
+        if (len === 0) { continue; }
+        if (seg.type !== 'equal') {
+          try {
+            const range = para.getTextRange(pos, len);
+            if (seg.type === 'insert') {
+              range.font.color     = '0070C0'; // Word blue
+              range.font.underline = PowerPoint.ShapeFontUnderlineStyle.single;
+              range.font.strikethrough = false;
+            } else if (seg.type === 'delete') {
+              range.font.color         = 'C00000'; // Word red
+              range.font.strikethrough = true;
+              range.font.underline     = PowerPoint.ShapeFontUnderlineStyle.none;
+            }
+            await ctx.sync();
+          } catch(re) { console.warn('range format fail', re); }
+        }
+        pos += len;
+      }
+    });
+  } catch(e) { console.warn('applyMarkup:', e); }
+}
+
+// ─── Accept: keep new text, strip markup, restore base font ──────────────────
+async function applyAccept(change) {
+  try {
+    await PowerPoint.run(async ctx => {
+      const shape = await getShape(ctx, change.shapeId);
+      if (!shape) return;
+
+      const tf = shape.textFrame;
+      // Set to new text (no deleted segments)
+      const newClean = change.diff
+        .filter(d => d.type !== 'delete')
+        .map(d => d.text).join('');
+
+      tf.text = newClean;
+      await ctx.sync();
+
+      await restoreBaseFont(ctx, tf, change.origParas);
+    });
+  } catch(e) { console.warn('applyAccept:', e); }
+}
+
+// ─── Reject: revert to old text, restore base font ───────────────────────────
+async function applyReject(change) {
+  try {
+    await PowerPoint.run(async ctx => {
+      const shape = await getShape(ctx, change.shapeId);
+      if (!shape) return;
+
+      const tf = shape.textFrame;
+      tf.text = change.oldText;
+      await ctx.sync();
+
+      await restoreBaseFont(ctx, tf, change.origParas);
+    });
+  } catch(e) { console.warn('applyReject:', e); }
+}
+
+// ─── Restore base font formatting ────────────────────────────────────────────
+async function restoreBaseFont(ctx, tf, origParas) {
+  tf.load('paragraphs');
+  await ctx.sync();
+  tf.paragraphs.load('items');
+  await ctx.sync();
+
+  const baseRun = origParas?.[0]?.runs?.[0] || {};
+
+  for (const para of tf.paragraphs.items) {
+    try {
+      para.load('textRanges');
+      await ctx.sync();
+      para.textRanges.load('items');
+      await ctx.sync();
+
+      for (const run of para.textRanges.items) {
+        run.font.strikethrough = false;
+        run.font.underline     = PowerPoint.ShapeFontUnderlineStyle.none;
+        if (baseRun.color && baseRun.color !== 'null' && baseRun.color !== null) {
+          run.font.color = String(baseRun.color).replace('#','');
+        }
+        if (baseRun.bold    !== undefined && baseRun.bold    !== null) run.font.bold   = baseRun.bold;
+        if (baseRun.italic  !== undefined && baseRun.italic  !== null) run.font.italic = baseRun.italic;
+        if (baseRun.size    !== undefined && baseRun.size    !== null) run.font.size   = baseRun.size;
+      }
+      await ctx.sync();
+    } catch(e) { console.warn('restoreBaseFont para error', e); }
+  }
+}
+
+// ─── Get shape by id ─────────────────────────────────────────────────────────
+async function getShape(ctx, shapeId) {
+  const slides = ctx.presentation.slides;
+  slides.load('items');
+  await ctx.sync();
+  if (!slides.items.length) return null;
+
+  const slide = slides.items[0];
+  slide.load('shapes');
+  await ctx.sync();
+  slide.shapes.load('items');
+  await ctx.sync();
+
+  for (const shape of slide.shapes.items) {
+    shape.load('id');
+    await ctx.sync();
+    if (shape.id === shapeId) return shape;
+  }
+  return null;
+}
+
+// ─── Poll ────────────────────────────────────────────────────────────────────
+async function poll() {
+  if (!isTracking) return;
+  try {
+    const current = await takeSnapshot();
+    const found   = detectChanges(snapshot, current);
+
+    // Apply markup for brand new changes
+    for (const c of found) {
+      changes.push(c);
+      await applyMarkup(c);
+    }
+
+    // Re-apply markup for updated existing changes
+    for (const c of changes.filter(x => !x.resolved && x._dirty)) {
+      await applyMarkup(c);
+      c._dirty = false;
+    }
+
+    if (found.length > 0) { renderChanges(); updateStatus(); }
+  } catch(e) { console.warn('poll error:', e); }
+
+  pollingTimer = setTimeout(poll, POLL_MS);
+}
+
+// ─── Toggle tracking ─────────────────────────────────────────────────────────
+async function toggleTracking() {
+  if (!isTracking) {
+    showToast('Snapshotting slide…');
+    snapshot = await takeSnapshot();
+    isTracking = true;
+    document.getElementById('trackLabel').textContent = 'Stop Tracking';
+    document.getElementById('trackIcon').textContent  = '■';
+    document.getElementById('btnTrack').classList.add('tracking');
+    document.getElementById('btnRefresh').disabled = false;
+    document.getElementById('statusDot').classList.add('active');
+    document.getElementById('statusText').textContent = 'Tracking — edit any text box';
+    pollingTimer = setTimeout(poll, POLL_MS);
+    showToast('Tracking started');
+  } else {
+    clearTimeout(pollingTimer);
+    isTracking = false;
+    document.getElementById('trackLabel').textContent = 'Start Tracking';
+    document.getElementById('trackIcon').textContent  = '▶';
+    document.getElementById('btnTrack').classList.remove('tracking');
+    document.getElementById('btnRefresh').disabled = true;
+    document.getElementById('statusDot').classList.remove('active');
+    document.getElementById('statusDot').classList.remove('reviewing');
+    document.getElementById('statusText').textContent = 'Tracking paused';
+    showToast('Tracking stopped');
+  }
+}
+
+async function manualCheck() {
+  showToast('Checking…');
+  const current = await takeSnapshot();
+  const found   = detectChanges(snapshot, current);
+  if (found.length > 0) {
+    for (const c of found) { changes.push(c); await applyMarkup(c); }
+    renderChanges(); updateStatus();
+    showToast(`${found.length} change${found.length > 1 ? 's' : ''} found`);
+  } else {
+    showToast('No new changes');
+  }
+}
+
+// ─── Accept / Reject ─────────────────────────────────────────────────────────
+async function acceptChange(id) {
+  const c = changes.find(x => x.id === id);
+  if (!c) return;
+  await applyAccept(c);
+  c.resolved   = true;
+  c.resolution = 'accepted';
+  // Update snapshot baseline so future edits diff against accepted state
+  if (snapshot[c.shapeId]) {
+    snapshot[c.shapeId].paragraphs = [{
+      runs: [{ text: c.diff.filter(d=>d.type!=='delete').map(d=>d.text).join(''), ...c.origParas?.[0]?.runs?.[0] }]
+    }];
+  }
+  renderChanges(); updateStatus();
+  showToast('Change accepted ✓');
+}
+
+async function rejectChange(id) {
+  const c = changes.find(x => x.id === id);
+  if (!c) return;
+  await applyReject(c);
+  c.resolved   = true;
+  c.resolution = 'rejected';
+  renderChanges(); updateStatus();
+  showToast('Change rejected ✕');
+}
+
+async function acceptAll() {
+  const pending = changes.filter(c => !c.resolved);
+  for (const c of pending) { await applyAccept(c); c.resolved = true; c.resolution = 'accepted'; }
+  renderChanges(); updateStatus();
+  showToast(`${pending.length} changes accepted ✓`);
+}
+
+async function rejectAll() {
+  const pending = changes.filter(c => !c.resolved);
+  for (const c of pending) { await applyReject(c); c.resolved = true; c.resolution = 'rejected'; }
+  renderChanges(); updateStatus();
+  showToast(`${pending.length} changes rejected ✕`);
+}
+
+// ─── Render ──────────────────────────────────────────────────────────────────
+function renderChanges() {
+  const area    = document.getElementById('changesArea');
+  const pending = changes.filter(c => !c.resolved);
+  const done    = changes.filter(c =>  c.resolved);
+
+  document.getElementById('btnAcceptAll').disabled = pending.length === 0;
+  document.getElementById('btnRejectAll').disabled = pending.length === 0;
+
+  if (!changes.length) {
+    area.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">📋</div>
+      <div class="empty-title">No changes yet</div>
+      <div class="empty-desc">Click "Start Tracking", then edit any text box on your slide. Click outside the text box and changes will appear here.</div>
+    </div>`;
+    return;
+  }
+
+  let html = '';
+  if (pending.length) {
+    html += `<div class="section-label">${pending.length} pending</div>`;
+    pending.forEach(c => { html += cardHtml(c); });
+  }
+  if (done.length) {
+    html += `<div class="section-label" style="margin-top:6px">${done.length} resolved</div>`;
+    done.forEach(c => { html += resolvedCardHtml(c); });
+  }
+  area.innerHTML = html;
+}
+
+function cardHtml(c) {
+  const cls   = c.type==='insert' ? 'badge-insert' : c.type==='delete' ? 'badge-delete' : 'badge-replace';
+  const label = c.type==='insert' ? 'Insertion'   : c.type==='delete' ? 'Deletion'    : 'Edit';
+  const init  = c.author.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+  return `
+  <div class="change-card">
+    <div class="card-header">
+      <span class="change-type-badge ${cls}">${label}</span>
+      <div class="card-author"><div class="avatar">${init}</div>${esc(c.author)}</div>
+      <span class="card-meta">${fmtTime(c.timestamp)}</span>
+    </div>
+    <div class="card-body">
+      <div class="card-slide-ref">${esc(c.shapeName)}</div>
+      <div class="diff-view">${buildDiffHtml(c.diff)}</div>
+    </div>
+    <div class="card-actions">
+      <button class="btn-accept" onclick="acceptChange('${c.id}')">✓ Accept</button>
+      <button class="btn-reject" onclick="rejectChange('${c.id}')">✕ Reject</button>
+    </div>
+  </div>`;
+}
+
+function resolvedCardHtml(c) {
+  const ok  = c.resolution === 'accepted';
+  const col = ok ? 'var(--insert-color)' : 'var(--delete-color)';
+  const bdr = ok ? 'rgba(45,164,78,0.25)' : 'rgba(248,81,73,0.25)';
+  const lbl = ok ? '✓ Accepted' : '✕ Rejected';
+  return `
+  <div class="change-card" style="opacity:0.5;border-color:${bdr}">
+    <div class="card-header">
+      <span style="font-size:10px;font-weight:700;color:${col}">${lbl}</span>
+      <div class="card-author"><div class="avatar">${c.author[0]}</div>${esc(c.author)}</div>
+      <span class="card-meta">${esc(c.shapeName)}</span>
+    </div>
+  </div>`;
+}
+
+function buildDiffHtml(diff) {
+  const CTX = 5;
+  const changed = new Set(diff.map((d,i) => d.type!=='equal' ? i : -1).filter(i=>i>=0));
+  const vis = new Set();
+  changed.forEach(i => { for(let k=Math.max(0,i-CTX); k<=Math.min(diff.length-1,i+CTX); k++) vis.add(k); });
+  let html='', prev=true;
+  for (let i=0; i<diff.length; i++) {
+    if (!vis.has(i)) { if(prev) html+='<span class="diff-context">…</span>'; prev=false; continue; }
+    prev=true;
+    const d=diff[i], t=esc(d.text);
+    if (d.type==='equal')  html+=`<span class="diff-context">${t}</span>`;
+    else if (d.type==='delete') html+=`<span class="diff-delete">${t}</span>`;
+    else html+=`<span class="diff-insert">${t}</span>`;
+  }
+  return html;
+}
+
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fmtTime(d) {
+  const s = Math.floor((Date.now()-d)/1000);
+  if (s<10) return 'just now';
+  if (s<60) return `${s}s ago`;
+  if (s<3600) return `${Math.floor(s/60)}m ago`;
+  return d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+}
+
+function updateStatus() {
+  const pending = changes.filter(c => !c.resolved);
+  const dot=document.getElementById('statusDot'), text=document.getElementById('statusText'), count=document.getElementById('changeCount');
+  if (pending.length) {
+    count.textContent = `${pending.length} change${pending.length>1?'s':''}`;
+    count.classList.add('visible');
+    dot.classList.remove('active'); dot.classList.add('reviewing');
+    text.textContent = `${pending.length} change${pending.length>1?'s':''} pending review`;
+  } else {
+    count.classList.remove('visible');
+    if (isTracking) { dot.classList.add('active'); dot.classList.remove('reviewing'); text.textContent = 'Tracking — edit any text box'; }
+  }
+}
+
+let toastTimer;
+function showToast(msg) {
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'), 2200);
+}
+</script>
+</body>
+</html>
